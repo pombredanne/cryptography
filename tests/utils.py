@@ -53,7 +53,7 @@ def load_nist_vectors(vector_data, op):
 
 def load_nist_vectors_from_file(filename, op):
     base = os.path.join(
-        os.path.dirname(__file__), "primitives", "vectors", "NIST",
+        os.path.dirname(__file__), "hazmat", "primitives", "vectors",
     )
     with open(os.path.join(base, filename), "r") as vector_file:
         return load_nist_vectors(vector_file, op)
@@ -61,7 +61,8 @@ def load_nist_vectors_from_file(filename, op):
 
 def load_cryptrec_vectors_from_file(filename):
     base = os.path.join(
-        os.path.dirname(__file__), "primitives", "vectors", "CRYPTREC",
+        os.path.dirname(__file__),
+        "hazmat", "primitives", "vectors",
     )
     with open(os.path.join(base, filename), "r") as vector_file:
         return load_cryptrec_vectors(vector_file)
@@ -90,12 +91,15 @@ def load_cryptrec_vectors(vector_data):
                 "plaintext": pt,
                 "ciphertext": ct
             })
+        else:
+            raise ValueError("Invalid line in file '{}'".format(line))
     return cryptrec_list
 
 
 def load_openssl_vectors_from_file(filename):
     base = os.path.join(
-        os.path.dirname(__file__), "primitives", "vectors", "OpenSSL",
+        os.path.dirname(__file__),
+        "hazmat", "primitives", "vectors",
     )
     with open(os.path.join(base, filename), "r") as vector_file:
         return load_openssl_vectors(vector_file)
@@ -119,3 +123,54 @@ def load_openssl_vectors(vector_data):
             "ciphertext": vector[4].encode("ascii"),
         })
     return vectors
+
+
+def load_hash_vectors(vector_data):
+    vectors = []
+    key = None
+    msg = None
+    md = None
+
+    for line in vector_data:
+        line = line.strip()
+
+        if not line or line.startswith("#") or line.startswith("["):
+            continue
+
+        if line.startswith("Len"):
+            length = int(line.split(" = ")[1])
+        elif line.startswith("Key"):
+            """
+            HMAC vectors contain a key attribute. Hash vectors do not.
+            """
+            key = line.split(" = ")[1].encode("ascii")
+        elif line.startswith("Msg"):
+            """
+            In the NIST vectors they have chosen to represent an empty
+            string as hex 00, which is of course not actually an empty
+            string. So we parse the provided length and catch this edge case.
+            """
+            msg = line.split(" = ")[1].encode("ascii") if length > 0 else b""
+        elif line.startswith("MD"):
+            md = line.split(" = ")[1]
+            # after MD is found the Msg+MD (+ potential key) tuple is complete
+            if key is not None:
+                vectors.append((msg, md, key))
+                key = None
+                msg = None
+                md = None
+            else:
+                vectors.append((msg, md))
+                msg = None
+                md = None
+        else:
+            raise ValueError("Unknown line in hash vector")
+    return vectors
+
+
+def load_hash_vectors_from_file(filename):
+    base = os.path.join(
+        os.path.dirname(__file__), "hazmat", "primitives", "vectors"
+    )
+    with open(os.path.join(base, filename), "r") as vector_file:
+        return load_hash_vectors(vector_file)
