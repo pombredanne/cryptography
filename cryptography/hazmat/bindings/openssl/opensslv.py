@@ -11,12 +11,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import, division, print_function
+
 INCLUDES = """
 #include <openssl/opensslv.h>
 """
 
 TYPES = """
-static char *const OPENSSL_VERSION_TEXT;
+/* Note that these will be resolved when cryptography is compiled and are NOT
+   guaranteed to be the version that it actually loads. */
+static const int OPENSSL_VERSION_NUMBER;
+static const char *const OPENSSL_VERSION_TEXT;
 """
 
 FUNCTIONS = """
@@ -27,3 +32,5 @@ MACROS = """
 
 CUSTOMIZATIONS = """
 """
+
+CONDITIONAL_NAMES = {}

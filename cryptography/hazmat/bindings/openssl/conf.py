@@ -11,6 +11,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import, division, print_function
+
 INCLUDES = """
 #include <openssl/conf.h>
 """
@@ -20,6 +22,8 @@ typedef ... CONF;
 """
 
 FUNCTIONS = """
+void OPENSSL_config(const char *);
+void OPENSSL_no_config(void);
 """
 
 MACROS = """
@@ -27,3 +31,5 @@ MACROS = """
 
 CUSTOMIZATIONS = """
 """
+
+CONDITIONAL_NAMES = {}

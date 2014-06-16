@@ -11,6 +11,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import, division, print_function
+
 INCLUDES = """
 #include <openssl/pkcs7.h>
 """
@@ -35,3 +37,5 @@ int PKCS7_type_is_data(PKCS7 *);
 
 CUSTOMIZATIONS = """
 """
+
+CONDITIONAL_NAMES = {}

@@ -16,57 +16,77 @@ from __future__ import absolute_import, division, print_function
 import binascii
 import os
 
+import pytest
+
 from cryptography.hazmat.primitives.ciphers import algorithms, modes
 
 from .utils import generate_encrypt_test
-from ...utils import load_nist_vectors_from_file
+from ...utils import load_nist_vectors
 
 
-class TestBlowfish(object):
+@pytest.mark.supported(
+    only_if=lambda backend: backend.cipher_supported(
+        algorithms.Blowfish("\x00" * 56), modes.ECB()
+    ),
+    skip_message="Does not support Blowfish ECB",
+)
+@pytest.mark.cipher
+class TestBlowfishModeECB(object):
     test_ECB = generate_encrypt_test(
-        lambda path: load_nist_vectors_from_file(path, "ENCRYPT"),
+        load_nist_vectors,
         os.path.join("ciphers", "Blowfish"),
         ["bf-ecb.txt"],
-        lambda key: algorithms.Blowfish(binascii.unhexlify(key)),
-        lambda key: modes.ECB(),
-        only_if=lambda backend: backend.ciphers.supported(
-            algorithms.Blowfish("\x00" * 56), modes.ECB()
-        ),
-        skip_message="Does not support Blowfish ECB",
+        lambda key, **kwargs: algorithms.Blowfish(binascii.unhexlify(key)),
+        lambda **kwargs: modes.ECB(),
     )
 
+
+@pytest.mark.supported(
+    only_if=lambda backend: backend.cipher_supported(
+        algorithms.Blowfish("\x00" * 56), modes.CBC("\x00" * 8)
+    ),
+    skip_message="Does not support Blowfish CBC",
+)
+@pytest.mark.cipher
+class TestBlowfishModeCBC(object):
     test_CBC = generate_encrypt_test(
-        lambda path: load_nist_vectors_from_file(path, "ENCRYPT"),
+        load_nist_vectors,
         os.path.join("ciphers", "Blowfish"),
         ["bf-cbc.txt"],
-        lambda key, iv: algorithms.Blowfish(binascii.unhexlify(key)),
-        lambda key, iv: modes.CBC(binascii.unhexlify(iv)),
-        only_if=lambda backend: backend.ciphers.supported(
-            algorithms.Blowfish("\x00" * 56), modes.CBC("\x00" * 8)
-        ),
-        skip_message="Does not support Blowfish CBC",
+        lambda key, **kwargs: algorithms.Blowfish(binascii.unhexlify(key)),
+        lambda iv, **kwargs: modes.CBC(binascii.unhexlify(iv)),
     )
 
+
+@pytest.mark.supported(
+    only_if=lambda backend: backend.cipher_supported(
+        algorithms.Blowfish("\x00" * 56), modes.OFB("\x00" * 8)
+    ),
+    skip_message="Does not support Blowfish OFB",
+)
+@pytest.mark.cipher
+class TestBlowfishModeOFB(object):
     test_OFB = generate_encrypt_test(
-        lambda path: load_nist_vectors_from_file(path, "ENCRYPT"),
+        load_nist_vectors,
         os.path.join("ciphers", "Blowfish"),
         ["bf-ofb.txt"],
-        lambda key, iv: algorithms.Blowfish(binascii.unhexlify(key)),
-        lambda key, iv: modes.OFB(binascii.unhexlify(iv)),
-        only_if=lambda backend: backend.ciphers.supported(
-            algorithms.Blowfish("\x00" * 56), modes.OFB("\x00" * 8)
-        ),
-        skip_message="Does not support Blowfish OFB",
+        lambda key, **kwargs: algorithms.Blowfish(binascii.unhexlify(key)),
+        lambda iv, **kwargs: modes.OFB(binascii.unhexlify(iv)),
     )
 
+
+@pytest.mark.supported(
+    only_if=lambda backend: backend.cipher_supported(
+        algorithms.Blowfish("\x00" * 56), modes.CFB("\x00" * 8)
+    ),
+    skip_message="Does not support Blowfish CFB",
+)
+@pytest.mark.cipher
+class TestBlowfishModeCFB(object):
     test_CFB = generate_encrypt_test(
-        lambda path: load_nist_vectors_from_file(path, "ENCRYPT"),
+        load_nist_vectors,
         os.path.join("ciphers", "Blowfish"),
         ["bf-cfb.txt"],
-        lambda key, iv: algorithms.Blowfish(binascii.unhexlify(key)),
-        lambda key, iv: modes.CFB(binascii.unhexlify(iv)),
-        only_if=lambda backend: backend.ciphers.supported(
-            algorithms.Blowfish("\x00" * 56), modes.CFB("\x00" * 8)
-        ),
-        skip_message="Does not support Blowfish CFB",
+        lambda key, **kwargs: algorithms.Blowfish(binascii.unhexlify(key)),
+        lambda iv, **kwargs: modes.CFB(binascii.unhexlify(iv)),
     )

@@ -11,59 +11,129 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import, division, print_function
+
 import pytest
 
-from cryptography.exceptions import UnsupportedAlgorithm
-from cryptography.hazmat.bindings.openssl.backend import backend, Backend
-from cryptography.hazmat.primitives.ciphers import Cipher
-from cryptography.hazmat.primitives.ciphers.algorithms import AES
-from cryptography.hazmat.primitives.ciphers.modes import CBC
-
-
-class FakeMode(object):
-    pass
-
-
-class FakeCipher(object):
-    pass
+from cryptography.hazmat.bindings.openssl.binding import Binding
 
 
 class TestOpenSSL(object):
-    def test_backend_exists(self):
-        assert backend
+    def test_binding_loads(self):
+        binding = Binding()
+        assert binding
+        assert binding.lib
+        assert binding.ffi
 
-    def test_openssl_version_text(self):
-        """
-        This test checks the value of OPENSSL_VERSION_TEXT.
+    def test_is_available(self):
+        assert Binding.is_available() is True
 
-        Unfortunately, this define does not appear to have a
-        formal content definition, so for now we'll test to see
-        if it starts with OpenSSL as that appears to be true
-        for every OpenSSL.
-        """
-        assert backend.openssl_version_text().startswith("OpenSSL")
+    def test_crypto_lock_init(self):
+        b = Binding()
+        b.init_static_locks()
+        lock_cb = b.lib.CRYPTO_get_locking_callback()
+        assert lock_cb != b.ffi.NULL
 
-    def test_supports_cipher(self):
-        assert backend.ciphers.supported(None, None) is False
+    def _skip_if_not_fallback_lock(self, b):
+        # only run this test if we are using our locking cb
+        original_cb = b.lib.CRYPTO_get_locking_callback()
+        if original_cb != b._lock_cb_handle:
+            pytest.skip(
+                "Not using the fallback Python locking callback "
+                "implementation. Probably because import _ssl set one"
+            )
 
-    def test_register_duplicate_cipher_adapter(self):
-        with pytest.raises(ValueError):
-            backend.ciphers.register_cipher_adapter(AES, CBC, None)
+    def test_fallback_crypto_lock_via_openssl_api(self):
+        b = Binding()
+        b.init_static_locks()
 
-    def test_instances_share_ffi(self):
-        b = Backend()
-        assert b.ffi is backend.ffi
-        assert b.lib is backend.lib
+        self._skip_if_not_fallback_lock(b)
 
-    def test_nonexistent_cipher(self):
-        b = Backend()
-        b.ciphers.register_cipher_adapter(
-            FakeCipher,
-            FakeMode,
-            lambda backend, cipher, mode: backend.ffi.NULL
+        # check that the lock state changes appropriately
+        lock = b._locks[b.lib.CRYPTO_LOCK_SSL]
+
+        # starts out unlocked
+        assert lock.acquire(False)
+        lock.release()
+
+        b.lib.CRYPTO_lock(
+            b.lib.CRYPTO_LOCK | b.lib.CRYPTO_READ,
+            b.lib.CRYPTO_LOCK_SSL, b.ffi.NULL, 0
         )
-        cipher = Cipher(
-            FakeCipher(), FakeMode(), backend=b,
+
+        # becomes locked
+        assert not lock.acquire(False)
+
+        b.lib.CRYPTO_lock(
+            b.lib.CRYPTO_UNLOCK | b.lib.CRYPTO_READ,
+            b.lib.CRYPTO_LOCK_SSL, b.ffi.NULL, 0
         )
-        with pytest.raises(UnsupportedAlgorithm):
-            cipher.encryptor()
+
+        # then unlocked
+        assert lock.acquire(False)
+        lock.release()
+
+    def test_fallback_crypto_lock_via_binding_api(self):
+        b = Binding()
+        b.init_static_locks()
+
+        self._skip_if_not_fallback_lock(b)
+
+        lock = b._locks[b.lib.CRYPTO_LOCK_SSL]
+
+        with pytest.raises(RuntimeError):
+            b._lock_cb(0, b.lib.CRYPTO_LOCK_SSL, "<test>", 1)
+
+        # errors shouldn't cause locking
+        assert lock.acquire(False)
+        lock.release()
+
+        b._lock_cb(b.lib.CRYPTO_LOCK | b.lib.CRYPTO_READ,
+                   b.lib.CRYPTO_LOCK_SSL, "<test>", 1)
+        # locked
+        assert not lock.acquire(False)
+
+        b._lock_cb(b.lib.CRYPTO_UNLOCK | b.lib.CRYPTO_READ,
+                   b.lib.CRYPTO_LOCK_SSL, "<test>", 1)
+        # unlocked
+        assert lock.acquire(False)
+        lock.release()
+
+    def test_add_engine_more_than_once(self):
+        b = Binding()
+        res = b.lib.Cryptography_add_osrandom_engine()
+        assert res == 2
+
+    def test_ssl_ctx_options(self):
+        # Test that we're properly handling 32-bit unsigned on all platforms.
+        b = Binding()
+        assert b.lib.SSL_OP_ALL > 0
+        ctx = b.lib.SSL_CTX_new(b.lib.TLSv1_method())
+        ctx = b.ffi.gc(ctx, b.lib.SSL_CTX_free)
+        resp = b.lib.SSL_CTX_set_options(ctx, b.lib.SSL_OP_ALL)
+        assert resp == b.lib.SSL_OP_ALL
+        assert b.lib.SSL_OP_ALL == b.lib.SSL_CTX_get_options(ctx)
+
+    def test_ssl_options(self):
+        # Test that we're properly handling 32-bit unsigned on all platforms.
+        b = Binding()
+        assert b.lib.SSL_OP_ALL > 0
+        ctx = b.lib.SSL_CTX_new(b.lib.TLSv1_method())
+        ctx = b.ffi.gc(ctx, b.lib.SSL_CTX_free)
+        ssl = b.lib.SSL_new(ctx)
+        ssl = b.ffi.gc(ssl, b.lib.SSL_free)
+        resp = b.lib.SSL_set_options(ssl, b.lib.SSL_OP_ALL)
+        assert resp == b.lib.SSL_OP_ALL
+        assert b.lib.SSL_OP_ALL == b.lib.SSL_get_options(ssl)
+
+    def test_ssl_mode(self):
+        # Test that we're properly handling 32-bit unsigned on all platforms.
+        b = Binding()
+        assert b.lib.SSL_OP_ALL > 0
+        ctx = b.lib.SSL_CTX_new(b.lib.TLSv1_method())
+        ctx = b.ffi.gc(ctx, b.lib.SSL_CTX_free)
+        ssl = b.lib.SSL_new(ctx)
+        ssl = b.ffi.gc(ssl, b.lib.SSL_free)
+        resp = b.lib.SSL_set_mode(ssl, b.lib.SSL_OP_ALL)
+        assert resp == b.lib.SSL_OP_ALL
+        assert b.lib.SSL_OP_ALL == b.lib.SSL_get_mode(ssl)

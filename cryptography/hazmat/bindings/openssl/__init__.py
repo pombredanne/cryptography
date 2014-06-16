@@ -11,7 +11,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from cryptography.hazmat.bindings.openssl.backend import backend
-
-
-__all__ = ["backend"]
+from __future__ import absolute_import, division, print_function

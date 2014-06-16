@@ -11,6 +11,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import, division, print_function
+
 INCLUDES = """
 #include <openssl/x509v3.h>
 """
@@ -95,3 +97,5 @@ const X509V3_EXT_METHOD *X509V3_EXT_get_nid(int);
 
 CUSTOMIZATIONS = """
 """
+
+CONDITIONAL_NAMES = {}

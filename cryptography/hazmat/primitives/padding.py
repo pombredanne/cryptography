@@ -11,19 +11,78 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import, division, print_function
+
+import sys
+
+import cffi
+
 import six
 
+from cryptography import utils
+from cryptography.exceptions import AlreadyFinalized
+from cryptography.hazmat.bindings.utils import _create_modulename
 from cryptography.hazmat.primitives import interfaces
+
+
+TYPES = """
+uint8_t Cryptography_check_pkcs7_padding(const uint8_t *, uint8_t);
+"""
+
+FUNCTIONS = """
+/* Returns the value of the input with the most-significant-bit copied to all
+   of the bits. */
+static uint8_t Cryptography_DUPLICATE_MSB_TO_ALL(uint8_t a) {
+    return (1 - (a >> (sizeof(uint8_t) * 8 - 1))) - 1;
+}
+
+/* This returns 0xFF if a < b else 0x00, but does so in a constant time
+   fashion */
+static uint8_t Cryptography_constant_time_lt(uint8_t a, uint8_t b) {
+    a -= b;
+    return Cryptography_DUPLICATE_MSB_TO_ALL(a);
+}
+
+uint8_t Cryptography_check_pkcs7_padding(const uint8_t *data,
+                                         uint8_t block_len) {
+    uint8_t i;
+    uint8_t pad_size = data[block_len - 1];
+    uint8_t mismatch = 0;
+    for (i = 0; i < block_len; i++) {
+        unsigned int mask = Cryptography_constant_time_lt(i, pad_size);
+        uint8_t b = data[block_len - 1 - i];
+        mismatch |= (mask & (pad_size ^ b));
+    }
+
+    /* Check to make sure the pad_size was within the valid range. */
+    mismatch |= ~Cryptography_constant_time_lt(0, pad_size);
+    mismatch |= Cryptography_constant_time_lt(block_len, pad_size);
+
+    /* Make sure any bits set are copied to the lowest bit */
+    mismatch |= mismatch >> 4;
+    mismatch |= mismatch >> 2;
+    mismatch |= mismatch >> 1;
+    /* Now check the low bit to see if it's set */
+    return (mismatch & 1) == 0;
+}
+"""
+
+_ffi = cffi.FFI()
+_ffi.cdef(TYPES)
+_lib = _ffi.verify(
+    source=FUNCTIONS,
+    modulename=_create_modulename([TYPES], FUNCTIONS, sys.version),
+    ext_package="cryptography",
+)
 
 
 class PKCS7(object):
     def __init__(self, block_size):
-        super(PKCS7, self).__init__()
         if not (0 <= block_size < 256):
-            raise ValueError("block_size must be in range(0, 256)")
+            raise ValueError("block_size must be in range(0, 256).")
 
         if block_size % 8 != 0:
-            raise ValueError("block_size must be a multiple of 8")
+            raise ValueError("block_size must be a multiple of 8.")
 
         self.block_size = block_size
 
@@ -34,21 +93,19 @@ class PKCS7(object):
         return _PKCS7UnpaddingContext(self.block_size)
 
 
-@interfaces.register(interfaces.PaddingContext)
+@utils.register_interface(interfaces.PaddingContext)
 class _PKCS7PaddingContext(object):
     def __init__(self, block_size):
-        super(_PKCS7PaddingContext, self).__init__()
         self.block_size = block_size
-        # TODO: O(n ** 2) complexity for repeated concatentation, we should use
-        # zero-buffer (#193)
+        # TODO: more copies than necessary, we should use zero-buffer (#193)
         self._buffer = b""
 
     def update(self, data):
         if self._buffer is None:
-            raise ValueError("Context was already finalized")
+            raise AlreadyFinalized("Context was already finalized.")
 
-        if isinstance(data, six.text_type):
-            raise TypeError("Unicode-objects must be encoded before padding")
+        if not isinstance(data, bytes):
+            raise TypeError("data must be bytes.")
 
         self._buffer += data
 
@@ -61,7 +118,7 @@ class _PKCS7PaddingContext(object):
 
     def finalize(self):
         if self._buffer is None:
-            raise ValueError("Context was already finalized")
+            raise AlreadyFinalized("Context was already finalized.")
 
         pad_size = self.block_size // 8 - len(self._buffer)
         result = self._buffer + six.int2byte(pad_size) * pad_size
@@ -69,21 +126,19 @@ class _PKCS7PaddingContext(object):
         return result
 
 
-@interfaces.register(interfaces.PaddingContext)
+@utils.register_interface(interfaces.PaddingContext)
 class _PKCS7UnpaddingContext(object):
     def __init__(self, block_size):
-        super(_PKCS7UnpaddingContext, self).__init__()
         self.block_size = block_size
-        # TODO: O(n ** 2) complexity for repeated concatentation, we should use
-        # zero-buffer (#193)
+        # TODO: more copies than necessary, we should use zero-buffer (#193)
         self._buffer = b""
 
     def update(self, data):
         if self._buffer is None:
-            raise ValueError("Context was already finalized")
+            raise AlreadyFinalized("Context was already finalized.")
 
-        if isinstance(data, six.text_type):
-            raise TypeError("Unicode-objects must be encoded before unpadding")
+        if not isinstance(data, bytes):
+            raise TypeError("data must be bytes.")
 
         self._buffer += data
 
@@ -99,23 +154,19 @@ class _PKCS7UnpaddingContext(object):
 
     def finalize(self):
         if self._buffer is None:
-            raise ValueError("Context was already finalized")
+            raise AlreadyFinalized("Context was already finalized.")
 
-        if not self._buffer:
-            raise ValueError("Invalid padding bytes")
+        if len(self._buffer) != self.block_size // 8:
+            raise ValueError("Invalid padding bytes.")
+
+        valid = _lib.Cryptography_check_pkcs7_padding(
+            self._buffer, self.block_size // 8
+        )
+
+        if not valid:
+            raise ValueError("Invalid padding bytes.")
 
         pad_size = six.indexbytes(self._buffer, -1)
-
-        if pad_size > self.block_size // 8:
-            raise ValueError("Invalid padding bytes")
-
-        mismatch = 0
-        for b in six.iterbytes(self._buffer[-pad_size:]):
-            mismatch |= b ^ pad_size
-
-        if mismatch != 0:
-            raise ValueError("Invalid padding bytes")
-
         res = self._buffer[:-pad_size]
         self._buffer = None
         return res

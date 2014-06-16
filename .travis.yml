@@ -1,38 +1,36 @@
-language: python
-python: 2.7
+language: c
+os:
+    - osx
+    - linux
+compiler:
+    - clang
+    - gcc
 env:
-    - TOX_ENV=py26
-    - TOX_ENV=py27
-    - TOX_ENV=py32
-    - TOX_ENV=py33
-    - TOX_ENV=pypy
-    - TOX_ENV=py26 CC=clang
-    - TOX_ENV=py27 CC=clang
-    - TOX_ENV=py32 CC=clang
-    - TOX_ENV=py33 CC=clang
-    - TOX_ENV=pypy CC=clang
-    - TOX_ENV=py26 OPENSSL=0.9.8
-    - TOX_ENV=py27 OPENSSL=0.9.8
-    - TOX_ENV=py32 OPENSSL=0.9.8
-    - TOX_ENV=py33 OPENSSL=0.9.8
-    - TOX_ENV=pypy OPENSSL=0.9.8
-    - TOX_ENV=py26 CC=clang OPENSSL=0.9.8
-    - TOX_ENV=py27 CC=clang OPENSSL=0.9.8
-    - TOX_ENV=py32 CC=clang OPENSSL=0.9.8
-    - TOX_ENV=py33 CC=clang OPENSSL=0.9.8
-    - TOX_ENV=pypy CC=clang OPENSSL=0.9.8
-    - TOX_ENV=docs
-    - TOX_ENV=pep8
-    - TOX_ENV=py3pep8
+    matrix:
+        - TOX_ENV=py26
+        - TOX_ENV=py27
+        - TOX_ENV=py32
+        - TOX_ENV=py33
+        - TOX_ENV=py34
+        - TOX_ENV=pypy
+        - TOX_ENV=py26 OPENSSL=0.9.8
+        - TOX_ENV=py27 OPENSSL=0.9.8
+        - TOX_ENV=py32 OPENSSL=0.9.8
+        - TOX_ENV=py33 OPENSSL=0.9.8
+        - TOX_ENV=py34 OPENSSL=0.9.8
+        - TOX_ENV=pypy OPENSSL=0.9.8
+        - TOX_ENV=docs
+        - TOX_ENV=pep8
+        - TOX_ENV=py3pep8
 
 install:
     - ./.travis/install.sh
 
 script:
-    - tox -e $TOX_ENV
+    - ./.travis/run.sh
 
 after_success:
-    - coveralls
+    - source ~/.venv/bin/activate && coveralls
 
 notifications:
     irc:
@@ -40,3 +38,24 @@ notifications:
             - "irc.freenode.org#cryptography-dev"
         use_notice: true
         skip_join: true
+
+matrix:
+    exclude:
+        - os: osx
+          compiler: gcc
+        - os: osx
+          env: TOX_ENV=pep8
+          compiler: clang
+        - os: osx
+          env: TOX_ENV=py3pep8
+          compiler: clang
+
+        - os: linux
+          env: TOX_ENV=docs
+          compiler: clang
+        - os: linux
+          env: TOX_ENV=pep8
+          compiler: clang
+        - os: linux
+          env: TOX_ENV=py3pep8
+          compiler: clang

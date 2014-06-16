@@ -16,17 +16,24 @@ from __future__ import absolute_import, division, print_function
 import binascii
 import os
 
+import pytest
+
 from cryptography.hazmat.primitives.ciphers import algorithms, modes
 
-from .utils import generate_encrypt_test
-from ...utils import (
-    load_nist_vectors_from_file, load_openssl_vectors_from_file
+from .utils import generate_aead_test, generate_encrypt_test
+from ...utils import load_nist_vectors
+
+
+@pytest.mark.supported(
+    only_if=lambda backend: backend.cipher_supported(
+        algorithms.AES("\x00" * 16), modes.CBC("\x00" * 16)
+    ),
+    skip_message="Does not support AES CBC",
 )
-
-
-class TestAES(object):
+@pytest.mark.cipher
+class TestAESModeCBC(object):
     test_CBC = generate_encrypt_test(
-        lambda path: load_nist_vectors_from_file(path, "ENCRYPT"),
+        load_nist_vectors,
         os.path.join("ciphers", "AES", "CBC"),
         [
             "CBCGFSbox128.rsp",
@@ -45,12 +52,21 @@ class TestAES(object):
             "CBCMMT192.rsp",
             "CBCMMT256.rsp",
         ],
-        lambda key, iv: algorithms.AES(binascii.unhexlify(key)),
-        lambda key, iv: modes.CBC(binascii.unhexlify(iv)),
+        lambda key, **kwargs: algorithms.AES(binascii.unhexlify(key)),
+        lambda iv, **kwargs: modes.CBC(binascii.unhexlify(iv)),
     )
 
+
+@pytest.mark.supported(
+    only_if=lambda backend: backend.cipher_supported(
+        algorithms.AES("\x00" * 16), modes.ECB()
+    ),
+    skip_message="Does not support AES ECB",
+)
+@pytest.mark.cipher
+class TestAESModeECB(object):
     test_ECB = generate_encrypt_test(
-        lambda path: load_nist_vectors_from_file(path, "ENCRYPT"),
+        load_nist_vectors,
         os.path.join("ciphers", "AES", "ECB"),
         [
             "ECBGFSbox128.rsp",
@@ -69,12 +85,21 @@ class TestAES(object):
             "ECBMMT192.rsp",
             "ECBMMT256.rsp",
         ],
-        lambda key: algorithms.AES(binascii.unhexlify(key)),
-        lambda key: modes.ECB(),
+        lambda key, **kwargs: algorithms.AES(binascii.unhexlify(key)),
+        lambda **kwargs: modes.ECB(),
     )
 
+
+@pytest.mark.supported(
+    only_if=lambda backend: backend.cipher_supported(
+        algorithms.AES("\x00" * 16), modes.OFB("\x00" * 16)
+    ),
+    skip_message="Does not support AES OFB",
+)
+@pytest.mark.cipher
+class TestAESModeOFB(object):
     test_OFB = generate_encrypt_test(
-        lambda path: load_nist_vectors_from_file(path, "ENCRYPT"),
+        load_nist_vectors,
         os.path.join("ciphers", "AES", "OFB"),
         [
             "OFBGFSbox128.rsp",
@@ -93,12 +118,21 @@ class TestAES(object):
             "OFBMMT192.rsp",
             "OFBMMT256.rsp",
         ],
-        lambda key, iv: algorithms.AES(binascii.unhexlify(key)),
-        lambda key, iv: modes.OFB(binascii.unhexlify(iv)),
+        lambda key, **kwargs: algorithms.AES(binascii.unhexlify(key)),
+        lambda iv, **kwargs: modes.OFB(binascii.unhexlify(iv)),
     )
 
+
+@pytest.mark.supported(
+    only_if=lambda backend: backend.cipher_supported(
+        algorithms.AES("\x00" * 16), modes.CFB("\x00" * 16)
+    ),
+    skip_message="Does not support AES CFB",
+)
+@pytest.mark.cipher
+class TestAESModeCFB(object):
     test_CFB = generate_encrypt_test(
-        lambda path: load_nist_vectors_from_file(path, "ENCRYPT"),
+        load_nist_vectors,
         os.path.join("ciphers", "AES", "CFB"),
         [
             "CFB128GFSbox128.rsp",
@@ -117,18 +151,80 @@ class TestAES(object):
             "CFB128MMT192.rsp",
             "CFB128MMT256.rsp",
         ],
-        lambda key, iv: algorithms.AES(binascii.unhexlify(key)),
-        lambda key, iv: modes.CFB(binascii.unhexlify(iv)),
+        lambda key, **kwargs: algorithms.AES(binascii.unhexlify(key)),
+        lambda iv, **kwargs: modes.CFB(binascii.unhexlify(iv)),
     )
 
+
+@pytest.mark.supported(
+    only_if=lambda backend: backend.cipher_supported(
+        algorithms.AES("\x00" * 16), modes.CFB8("\x00" * 16)
+    ),
+    skip_message="Does not support AES CFB8",
+)
+@pytest.mark.cipher
+class TestAESModeCFB8(object):
+    test_CFB8 = generate_encrypt_test(
+        load_nist_vectors,
+        os.path.join("ciphers", "AES", "CFB"),
+        [
+            "CFB8GFSbox128.rsp",
+            "CFB8GFSbox192.rsp",
+            "CFB8GFSbox256.rsp",
+            "CFB8KeySbox128.rsp",
+            "CFB8KeySbox192.rsp",
+            "CFB8KeySbox256.rsp",
+            "CFB8VarKey128.rsp",
+            "CFB8VarKey192.rsp",
+            "CFB8VarKey256.rsp",
+            "CFB8VarTxt128.rsp",
+            "CFB8VarTxt192.rsp",
+            "CFB8VarTxt256.rsp",
+            "CFB8MMT128.rsp",
+            "CFB8MMT192.rsp",
+            "CFB8MMT256.rsp",
+        ],
+        lambda key, **kwargs: algorithms.AES(binascii.unhexlify(key)),
+        lambda iv, **kwargs: modes.CFB8(binascii.unhexlify(iv)),
+    )
+
+
+@pytest.mark.supported(
+    only_if=lambda backend: backend.cipher_supported(
+        algorithms.AES("\x00" * 16), modes.CTR("\x00" * 16)
+    ),
+    skip_message="Does not support AES CTR",
+)
+@pytest.mark.cipher
+class TestAESModeCTR(object):
     test_CTR = generate_encrypt_test(
-        load_openssl_vectors_from_file,
+        load_nist_vectors,
         os.path.join("ciphers", "AES", "CTR"),
         ["aes-128-ctr.txt", "aes-192-ctr.txt", "aes-256-ctr.txt"],
-        lambda key, iv: algorithms.AES(binascii.unhexlify(key)),
-        lambda key, iv: modes.CTR(binascii.unhexlify(iv)),
-        only_if=lambda backend: backend.ciphers.supported(
-            algorithms.AES("\x00" * 16), modes.CTR("\x00" * 16)
-        ),
-        skip_message="Does not support AES CTR",
+        lambda key, **kwargs: algorithms.AES(binascii.unhexlify(key)),
+        lambda iv, **kwargs: modes.CTR(binascii.unhexlify(iv)),
+    )
+
+
+@pytest.mark.supported(
+    only_if=lambda backend: backend.cipher_supported(
+        algorithms.AES("\x00" * 16), modes.GCM("\x00" * 12)
+    ),
+    skip_message="Does not support AES GCM",
+)
+@pytest.mark.cipher
+class TestAESModeGCM(object):
+    test_GCM = generate_aead_test(
+        load_nist_vectors,
+        os.path.join("ciphers", "AES", "GCM"),
+        [
+            "gcmDecrypt128.rsp",
+            "gcmDecrypt192.rsp",
+            "gcmDecrypt256.rsp",
+            "gcmEncryptExtIV128.rsp",
+            "gcmEncryptExtIV192.rsp",
+            "gcmEncryptExtIV256.rsp",
+        ],
+        lambda key: algorithms.AES(key),
+        lambda iv, tag: modes.GCM(iv, tag),
     )

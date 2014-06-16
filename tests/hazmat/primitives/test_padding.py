@@ -11,10 +11,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import, division, print_function
+
 import pytest
 
 import six
 
+from cryptography.exceptions import AlreadyFinalized
 from cryptography.hazmat.primitives import padding
 
 
@@ -29,6 +32,8 @@ class TestPKCS7(object):
         (128, b"1111111111111111"),
         (128, b"111111111111111\x06"),
         (128, b""),
+        (128, b"\x06" * 6),
+        (128, b"\x00" * 16),
     ])
     def test_invalid_padding(self, size, padded):
         unpadder = padding.PKCS7(size).unpadder()
@@ -93,15 +98,15 @@ class TestPKCS7(object):
     def test_use_after_finalize(self):
         padder = padding.PKCS7(128).padder()
         b = padder.finalize()
-        with pytest.raises(ValueError):
+        with pytest.raises(AlreadyFinalized):
             padder.update(b"")
-        with pytest.raises(ValueError):
+        with pytest.raises(AlreadyFinalized):
             padder.finalize()
 
         unpadder = padding.PKCS7(128).unpadder()
         unpadder.update(b)
         unpadder.finalize()
-        with pytest.raises(ValueError):
+        with pytest.raises(AlreadyFinalized):
             unpadder.update(b"")
-        with pytest.raises(ValueError):
+        with pytest.raises(AlreadyFinalized):
             unpadder.finalize()
